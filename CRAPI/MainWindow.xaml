@@ -6,8 +6,12 @@
         xmlns:local="clr-namespace:CRAPI"
         mc:Ignorable="d"
         Title="MainWindow" Height="350" Width="525">
-    <Grid>
+    <DockPanel LastChildFill="True">
+    <StackPanel Orientation="Vertical">
+      <Button Content="Mute" x:Name="btnMute" Click="btnMute_Click"></Button>
+      <Button Content="Un Mute" x:Name="btnUnMute" Click="btnUnMute_Click"></Button>
+    </StackPanel>
     <ListBox ItemsSource="{Binding Log}"  x:Name="logBox">
     </ListBox>
-    </Grid>
+    </DockPanel>
 </Window>

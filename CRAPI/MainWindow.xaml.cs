@@ -16,6 +16,7 @@ namespace CRAPI
   public partial class MainWindow : Window
   {
     public ObservableCollection<object> Log { get; set; }
+    NetworkStream _tcp_stream = null;
 
     public MainWindow()
     {
@@ -27,13 +28,13 @@ namespace CRAPI
 
       // just a normal TCP connection
       TcpClient tcp = new TcpClient("pratt110.local", 1710);
-      var s = tcp.GetStream();
+      _tcp_stream = tcp.GetStream();
 
       int pageId = 0;
 
       // the core needs to be pinged to keep the connection alive
       Timer t = new Timer(new TimerCallback((st) => {
-        Rpc.Send(s, new NoOp());
+        Rpc.Send(_tcp_stream, new NoOp());
       }), null, 0, 5000);
 
       System.Threading.Thread rxThread = new System.Threading.Thread(() =>
@@ -42,7 +43,7 @@ namespace CRAPI
         try
         {
           // json is returned
-          var obj = Rpc.ReadResponseObject(s);
+          var obj = Rpc.ReadResponseObject(_tcp_stream);
           while (obj != null)
           {
             try
@@ -78,7 +79,7 @@ namespace CRAPI
             {
               Console.WriteLine("Read Thread LOOP Exception (Continuing on) {0}", EX.Message);
             }
-            obj = Rpc.ReadResponseObject(s);// as IDictionary<string, object>;
+            obj = Rpc.ReadResponseObject(_tcp_stream);// as IDictionary<string, object>;
           }
         }
         catch (ThreadAbortException TAE)
@@ -98,10 +99,10 @@ namespace CRAPI
       rxThread.Start(); // start the response listener
 
       // tell the core we want to watch zone changes
-      Rpc.Send(s, new WatchEnable { Enabled = true });
+      Rpc.Send(_tcp_stream, new WatchEnable { Enabled = true });
 
       // submite a test page
-      Rpc.Send(s, new PageSubmit
+      Rpc.Send(_tcp_stream, new PageSubmit
       {
         Mode = "message",
         Originator = "Test App",
@@ -123,7 +124,7 @@ namespace CRAPI
         {
           rxThread.Abort();
         }
-        s.Close();
+        _tcp_stream.Close();
         tcp.Close();
 
       };
@@ -143,6 +144,16 @@ namespace CRAPI
         }
       }
     }
+
+    private void btnMute_Click(object sender, RoutedEventArgs e)
+    {
+      Rpc.Send(_tcp_stream, new ControlSet { Name = "SystemMuteMute", Value = 1 });
+    }
+
+    private void btnUnMute_Click(object sender, RoutedEventArgs e)
+    {
+      Rpc.Send(_tcp_stream, new ControlSet { Name = "SystemMuteMute", Value = -1 });
+    }
   }
 
   public interface IRPCCommand
@@ -150,6 +161,20 @@ namespace CRAPI
     string Method { get; }
   }
 
+  class ControlSet : IRPCCommand
+  {
+    public string Method
+    {
+      get
+      {
+        return "Control.Set";
+      }
+    }
+
+    public string Name { get; set; }
+    public double Value { get; set; }
+
+  }
 
   /// <summary>
   /// Send Command to tell core to send status changes back
