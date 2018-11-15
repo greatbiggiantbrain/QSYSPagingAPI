@@ -3,10 +3,13 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Net;
 using System.Net.Sockets;
+using System.Speech.Synthesis;
 using System.Threading;
 using System.Windows;
 using System.Windows.Data;
+using System.Windows.Threading;
 
 namespace CRAPI
 {
@@ -27,7 +30,7 @@ namespace CRAPI
       this.DataContext = this;
 
       // just a normal TCP connection
-      TcpClient tcp = new TcpClient("pratt510.local", 1710);
+      TcpClient tcp = new TcpClient("pratt110.local", 1710);
       _tcp_stream = tcp.GetStream();
       
       int pageId = 0;
@@ -101,6 +104,45 @@ namespace CRAPI
       // tell the core we want to watch zone changes
       Rpc.Send(_tcp_stream, new WatchEnable { Enabled = true });
 
+      synth = new SpeechSynthesizer();
+
+      // Close everything when the app closes
+      this.Closing += (sender, e) =>
+      {
+        t.Change(0, Timeout.Infinite);
+        if (!rxThread.Join(500))
+        {
+          rxThread.Abort();
+        }
+        _tcp_stream.Close();
+        tcp.Close();
+        _player.Stop();
+        _player = null;
+      };
+
+      _player = new DispatcherTimer();
+      _player.Interval = TimeSpan.FromSeconds(60);
+      _player.Tick += _player_Tick;
+    }
+
+    private void _player_Tick(object sender, EventArgs e)
+    {
+      string file = string.Format("test{0}.wav", Rpc.id);
+      var localPath = @"D:\paging\" + file;
+      var remotePath = "Messages/" + file;
+
+      using (SpeechSynthesizer ss = new SpeechSynthesizer())
+      {
+        ss.SetOutputToWaveFile(localPath);
+        ss.Speak(string.Format("Now playing message {0}", Rpc.id));
+      }
+      using (var webclient = new PreAuthWebClient())
+      {
+        webclient.AllowStreamBuffering = true;
+        webclient.Credentials = new NetworkCredential("Guest", "");  // this could be locked down via Administrator
+        webclient.UploadFile(@"http://pratt110.local/cgi-bin/media_put?file=" + remotePath, "PUT", localPath);
+      }
+
       // submit a test page
       Rpc.Send(_tcp_stream, new PageSubmit
       {
@@ -113,24 +155,13 @@ namespace CRAPI
         Priority = 2,
         Start = true,
         Preamble = "",
-        Message = "Southwest_as_a_reminder.wav"
+        Message = file
       });
-
-      // Close everything when the app closes
-      this.Closing += (sender, e) =>
-      {
-        t.Change(0, Timeout.Infinite);
-        if (!rxThread.Join(500))
-        {
-          rxThread.Abort();
-        }
-        _tcp_stream.Close();
-        tcp.Close();
-
-      };
     }
 
+    SpeechSynthesizer synth;
     object _itemsLock = new object();
+    DispatcherTimer _player;
 
 
     private void Log_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
@@ -157,12 +188,22 @@ namespace CRAPI
 
     private void btnUpload_Click(object sender, RoutedEventArgs e)
     {
-      using (var webclient = new System.Net.WebClient())
+      using (var webclient = new PreAuthWebClient())
       {
+        webclient.AllowStreamBuffering = true;
+        webclient.Credentials = new NetworkCredential("Guest", "");
+
         var localPath = @"D:\guitar\DiscoJazz.mp3";
         var remotePath = "Audio/DiscoJazz.mp3";
-        webclient.UploadFile(@"http://pratt510.local/cgi-bin/media_put?file=" + remotePath, "PUT", localPath);
+        webclient.UploadFile(@"http://pratt110.local/cgi-bin/media_put?file=" + remotePath, "PUT", localPath);
       }
+
+    }
+
+    private void btnPlay_Click(object sender, RoutedEventArgs e)
+    {
+      _player.Start();
+      _player_Tick(this, null);
 
     }
   }
@@ -294,6 +335,32 @@ namespace CRAPI
     {
       string isActive = Active ? "" : "Not";
       return string.Format("Zone {0} is {1} Active", Zone, isActive);
+    }
+  }
+
+
+
+  // preauth web client is needed for 
+  // 7.0+ firmware
+  class PreAuthWebClient : WebClient
+  {
+    public bool AllowStreamBuffering { get; set; }
+    public bool Expect100Continue { get; set; }
+    protected override WebRequest GetWebRequest(Uri address)
+    {
+      var rq = base.GetWebRequest(address);
+      if (rq is HttpWebRequest)
+      {
+        HttpWebRequest hrq = (HttpWebRequest)rq;
+        hrq.ServicePoint.Expect100Continue = Expect100Continue;
+        hrq.PreAuthenticate = true;
+        hrq.AllowWriteStreamBuffering = AllowStreamBuffering;
+      }
+      return rq;
+    }
+    public PreAuthWebClient()
+    {
+      Expect100Continue = false;
     }
   }
 }

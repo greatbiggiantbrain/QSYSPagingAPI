@@ -12,7 +12,7 @@ namespace CRAPI
   static class Rpc
   {
 
-    static int id = 100;
+    public static int id = 100;
 
     public static JObject ReadResponseObject(NetworkStream stream)
     {
