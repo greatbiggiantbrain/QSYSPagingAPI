@@ -4,12 +4,14 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CRAPI"
-        mc:Ignorable="d"
+        mc:Ignorable="d" FontSize="50"
         Title="MainWindow" Height="350" Width="525">
     <DockPanel LastChildFill="True">
     <StackPanel Orientation="Vertical">
       <Button Content="Mute" x:Name="btnMute" Click="btnMute_Click"></Button>
       <Button Content="Un Mute" x:Name="btnUnMute" Click="btnUnMute_Click"></Button>
+      <Button Content="Upload" x:Name="btnUpload" Click="btnUpload_Click"></Button>
+              
     </StackPanel>
     <ListBox ItemsSource="{Binding Log}"  x:Name="logBox">
     </ListBox>

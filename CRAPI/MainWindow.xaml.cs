@@ -27,9 +27,9 @@ namespace CRAPI
       this.DataContext = this;
 
       // just a normal TCP connection
-      TcpClient tcp = new TcpClient("pratt110.local", 1710);
+      TcpClient tcp = new TcpClient("pratt510.local", 1710);
       _tcp_stream = tcp.GetStream();
-
+      
       int pageId = 0;
 
       // the core needs to be pinged to keep the connection alive
@@ -101,7 +101,7 @@ namespace CRAPI
       // tell the core we want to watch zone changes
       Rpc.Send(_tcp_stream, new WatchEnable { Enabled = true });
 
-      // submite a test page
+      // submit a test page
       Rpc.Send(_tcp_stream, new PageSubmit
       {
         Mode = "message",
@@ -147,19 +147,43 @@ namespace CRAPI
 
     private void btnMute_Click(object sender, RoutedEventArgs e)
     {
-      Rpc.Send(_tcp_stream, new ControlSet { Name = "SystemMuteMute", Value = 1 });
+      Rpc.Send(_tcp_stream, new ControlSet { Name = "DanteInCoreSlotCChannel1SubscriptionChannel", Value = 04 });
     }
 
     private void btnUnMute_Click(object sender, RoutedEventArgs e)
     {
       Rpc.Send(_tcp_stream, new ControlSet { Name = "SystemMuteMute", Value = -1 });
     }
+
+    private void btnUpload_Click(object sender, RoutedEventArgs e)
+    {
+      using (var webclient = new System.Net.WebClient())
+      {
+        var localPath = @"D:\guitar\DiscoJazz.mp3";
+        var remotePath = "Audio/DiscoJazz.mp3";
+        webclient.UploadFile(@"http://pratt510.local/cgi-bin/media_put?file=" + remotePath, "PUT", localPath);
+      }
+
+    }
   }
+
+  // ####################
+  // INTERFACES
+  // ####################
 
   public interface IRPCCommand
   {
     string Method { get; }
   }
+
+  public interface IRPCResponse
+  {
+
+  }
+
+  // ####################
+  // RPC COMMANDS
+  // ####################
 
   class ControlSet : IRPCCommand
   {
@@ -173,6 +197,8 @@ namespace CRAPI
 
     public string Name { get; set; }
     public double Value { get; set; }
+    public string String { get; set; }
+    public double Position { get; set; }
 
   }
 
@@ -227,9 +253,32 @@ namespace CRAPI
   }
 
   /// <summary>
+  /// Send Command to ping the core
+  /// </summary>
+  class NoOp : IRPCCommand
+  {
+    public string Method
+    {
+      get
+      {
+        return "NoOp";
+      }
+    }
+
+    public override string ToString()
+    {
+      return "PING";
+    }
+  }
+
+  // ####################
+  // RPC RESPONSES
+  // ####################
+
+  /// <summary>
   /// Receive Command for zone status changes
   /// </summary>
-  public class ZoneStatus
+  public class ZoneStatus : IRPCResponse
   {
     public ZoneStatus(JObject o)
     {
@@ -247,23 +296,4 @@ namespace CRAPI
       return string.Format("Zone {0} is {1} Active", Zone, isActive);
     }
   }
-
-  /// <summary>
-  /// Send Command to ping the core
-  /// </summary>
-  class NoOp : IRPCCommand
-  {
-    public string Method
-    {
-      get
-      {
-        return "NoOp";
-      }
-    }
-
-    public override string ToString()
-    {
-        return "PING";
-      }
-    }
 }
