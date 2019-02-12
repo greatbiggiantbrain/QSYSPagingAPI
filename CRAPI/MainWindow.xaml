@@ -12,6 +12,7 @@
       <Button Content="Un Mute" x:Name="btnUnMute" Click="btnUnMute_Click"></Button>
       <Button Content="Upload" x:Name="btnUpload" Click="btnUpload_Click"></Button>
       <Button Content="Play" x:Name="btnPlay" Click="btnPlay_Click"></Button>
+      <Button Content="Change Group" x:Name="btnChangeGroup" Click="btnChangeGroup_Click"></Button>
 
     </StackPanel>
     <ListBox ItemsSource="{Binding Log}"  x:Name="logBox">

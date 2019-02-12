@@ -28,7 +28,7 @@ namespace CRAPI
       BindingOperations.EnableCollectionSynchronization(Log, _itemsLock);
       Log.CollectionChanged += Log_CollectionChanged;
       this.DataContext = this;
-
+      //return;
       // just a normal TCP connection
       TcpClient tcp = new TcpClient("pratt110.local", 1710);
       _tcp_stream = tcp.GetStream();
@@ -51,6 +51,7 @@ namespace CRAPI
           {
             try
             {
+              Console.WriteLine(obj.ToString());
                 JToken oMethod;
                 string method = "";
                 if (obj.TryGetValue("method", out oMethod))
@@ -198,12 +199,55 @@ namespace CRAPI
         webclient.UploadFile(@"http://pratt110.local/cgi-bin/media_put?file=" + remotePath, "PUT", localPath);
       }
 
+
+
     }
 
     private void btnPlay_Click(object sender, RoutedEventArgs e)
     {
       _player.Start();
       _player_Tick(this, null);
+
+    }
+
+    private void btnChangeGroup_Click(object sender, RoutedEventArgs e)
+    {
+      // FROM THIS DOCUMENT DESCRIBING THE JSON RPC FOR Q-SYS CONTROL
+      // http://q-syshelp.qschome.com/#External_Control/Q-SYS_Remote_Control/QRCDocumentation.pdf%3FTocPath%3DExternal%2520Control%7CQ-SYS%2520Remote%2520Control%7C_____1
+
+      // anything you can drag in as a named control can be monitored (and controlled)
+      // you could grab the message textbox from the PA router, and the active indicator etc
+
+      // the two items here are "Named Controls" in Q-SYS, if you add them to the Change Group, they will send back their changes
+      // you'll have to add the named controls to your design, or change them here to match your design
+      Rpc.Send(_tcp_stream, new ChangeGroupAddControl { Id = "MyChangeGroup", Controls = new string[] { "Mic/ControlPageStation-2Gain", "Mic/ControlPageStation-2Mute" } });
+
+      // If you set up auto polling, the change group will respond every x seconds
+      // only with the changes since the last response
+      Rpc.Send(_tcp_stream, new ChangeGroupAutoPoll { Id = "MyChangeGroup", Rate = 3 });
+
+      // You can also not do an auto poll and just ask on your own using the "ChangeGroup.Poll" method (not implemented here). It would be a one shot thing on your own timer
+
+      /*
+A sample return from a ChangeGroup poll
+FROM CORE : {"jsonrpc":"2.0","method":"ChangeGroup.Poll","params":{"Id":"MyChangeGroup","Changes":[{"Name":"Mic/ControlPageStation-2Gain","String":"-42.1dB","Value":-42.09999847,"Position":0.48250001,"Indeterminate":true}]}}
+{
+  "jsonrpc": "2.0",
+  "method": "ChangeGroup.Poll",
+  "params": {
+    "Id": "MyChangeGroup",
+    "Changes": [
+      {
+        "Name": "Mic/ControlPageStation-2Gain",
+        "String": "-42.1dB",
+        "Value": -42.09999847,
+        "Position": 0.48250001,
+        "Indeterminate": true
+      }
+    ]
+  }
+}
+       */
 
     }
   }
@@ -312,9 +356,45 @@ namespace CRAPI
     }
   }
 
+  class ChangeGroupAddControl : IRPCCommand
+  {
+    public string Method
+    {
+      get
+      {
+        return "ChangeGroup.AddControl";
+      }
+    }
+
+    // the name of this change group
+    public string Id { get; set; }
+    public string[] Controls { get; set; }
+  }
+
+  class ChangeGroupAutoPoll : IRPCCommand
+  {
+    public string Method
+    {
+      get
+      {
+        return "ChangeGroup.AutoPoll";
+      }
+    }
+
+    // the name of this change group
+    public string Id { get; set; }
+    public int Rate { get; set; }
+  }
+
   // ####################
   // RPC RESPONSES
   // ####################
+
+  //  public class ChangeGroupResponse : IRPCResponse
+  //{
+
+  //  public 
+  //}
 
   /// <summary>
   /// Receive Command for zone status changes
@@ -338,8 +418,7 @@ namespace CRAPI
     }
   }
 
-
-
+  
   // preauth web client is needed for 
   // 7.0+ firmware
   class PreAuthWebClient : WebClient
